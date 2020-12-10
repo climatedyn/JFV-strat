@@ -122,7 +122,10 @@ private
    real :: tau_t=40, tau_N_p=20, tau_S_p=20, delta_phi=30, tau_m=5 ! stratospheric relaxation time setup (tropics, northpole, southpole)
    real :: tau_fact=1.0 ! scale the stratospheric tau profile (0 -> tau=tau_t, 1 -> full tau profile)
    logical :: do_seasonal_cycle=.true.  !add seasonal cycle in stratosphere?
-   real :: days_per_year=365             !for determining seasonal cycle
+   real :: days_per_year=365            !for determining seasonal cycle
+   real :: perpet_day=0                 !if do_seasonal_cycle=.false., set day of year for
+                                        ! perpetual simulation [mj 12/2020]
+   
 !-----------------------------------------------------------------------
 
    namelist /hs_forcing_nml/  no_forcing, surface_forcing_input,             &
@@ -150,8 +153,9 @@ private
                               equilibrium_tau_option,equilibrium_tau_file,   &  !mj
                               p_hs,p_bd,A_NH_0,A_NH_1,A_SH_0,A_SH_1,A_s,     &  !mj
                               phi_N,phi_S,tau_t,tau_N_p,tau_S_p,delta_phi,   &  !mj
-                              T_fact,tau_fact,                              &  !mj
-                              tau_m,do_seasonal_cycle,days_per_year             !mj
+                              T_fact,tau_fact,                               &  !mj
+                              tau_m,do_seasonal_cycle,days_per_year,         &  !mj
+                              perpet_day                                        !mj
 
 !-----------------------------------------------------------------------
 
@@ -374,6 +378,11 @@ use     tracer_manager_mod, only: get_tracer_index, NO_TRACER !mj
         pv_sat_flag=.false.
         sat_only_flag=.false.
      endif
+     if(do_seasonal_cycle .and. perpet_day .ne. 0)then
+         call error_mesg ('hs_forcing_nml', &
+              'do_seasonal_cycle = .true. but perpet_day != 0: need to decide whether you want a seasonal cycle or not!',FATAL)
+      endif
+        
      if(do_seasonal_cycle) sc_flag = .true.
 
 !     ----- write version info and namelist to log file -----
@@ -620,17 +629,17 @@ real, intent(in),  dimension(:,:,:), optional :: mask
       if(sc_flag)then
          t0n=0
          t0s=days_per_year/2
-!         if (.not.present(Time)) call error_mesg('newtonian_damping','sc_flag true but time not present',FATAL)
+         !         if (.not.present(Time)) call error_mesg('newtonian_damping','sc_flag true but time not present',FATAL)
          call get_time(Time,seconds,days)
          t_days = days+seconds/86400
-         es = max(0.0,sin((t_days-t0s)*2*pid/days_per_year));
-         en = max(0.0,sin((t_days-t0n)*2*pid/days_per_year));
-         eps_sc = eps*cos(2*pid*t_days/days_per_year)
+      else
+         t_days = perpet_day
+      endif
+      es = max(0.0,sin((t_days-t0s)*2*pid/days_per_year));
+      en = max(0.0,sin((t_days-t0n)*2*pid/days_per_year));
+      eps_sc = eps*cos(2*pid*t_days/days_per_year)
 !         eps_sc =  -eps*sin((t_days-t0s)/360*2*pif*180)
 !mj
-      else
-         eps_sc = eps
-      endif
 
       t_star(:,:) = t_zero - delh*sin_lat_2(:,:) - eps_sc*sin_lat(:,:)
       if ( .not. pv_sat_flag) then
@@ -781,8 +790,10 @@ real, intent(in),  dimension(:,:,:), optional :: mask
             if ( do_seasonal_cycle ) then
                call get_time(Time,seconds,days)
                t_days = days+seconds/86400.
+            else if ( perpet_day .lt. 0 ) then
+               t_days = 0.
             else
-               t_days = 0
+               t_days = perpet_day
             endif
             where ( lat .ge. 0. )
                D = cos(twopi*t_days/days_per_year)
