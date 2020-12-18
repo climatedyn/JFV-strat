@@ -21,13 +21,16 @@
     equilibrium_t_option = 'JFV',
     pv_sat_flag   =  .false.,
     sat_only_flag =  .false.,
-    pv_gamma = 4.e-3
-    pv_phi0 = 50.,
-    pv_dphi = -10.,
-    sc_flag = .false.,
+    do_seasonal_cycle = .false.,
+    perpet_day = 220,
     sponge_flag	=  .true.,
     sponge_pbottom = 5.e1,
-    sponge_tau_days = 0.5
+    sponge_tau_days = 0.5,
+    local_heating_option = 'Gaussian",
+    local_heating_constamp = 0.0,
+    local_heating_latwith = 20.,
+    local_heating_sigwidth = 0.11,
+    local_heating_sigcenter = 0.3,
 /
 
  &main_nml
