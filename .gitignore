@@ -2,3 +2,7 @@ exec/
 *.o
 *.mod
 *~
+\#*
+.#*
+mppnccombine.ifort
+
