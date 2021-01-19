@@ -170,7 +170,7 @@ private
    integer :: id_teq, id_tau, id_tdt, id_udt, id_vdt, id_tdt_diss, id_diss_heat, id_local_heating, id_newtonian_damping
    real    :: missing_value = -1.e10
    real    :: xwidth, ywidth, xcenter, ycenter ! namelist values converted from degrees to radians
-   real    :: srfamp, polar_srfamp! local_heating_srfamp converted from deg/day to deg/sec
+   real    :: srfamp, polar_srfamp, constamp ! local_heating_srfamp converted from deg/day to deg/sec
    character(len=14) :: mod_name = 'hs_forcing'
 
    logical :: module_is_initialized = .false.
@@ -408,6 +408,7 @@ use     tracer_manager_mod, only: get_tracer_index, NO_TRACER !mj
 !     ----- convert local_heating_srfamp from deg/day to deg/sec ----
 
       srfamp = local_heating_srfamp/SECONDS_PER_DAY
+      constamp = local_heating_constamp/SECONDS_PER_DAY
       polar_srfamp = polar_heating_srfamp/SECONDS_PER_DAY
 
 !     ----- compute coefficients -----
@@ -1336,7 +1337,7 @@ else if(trim(local_heating_option) == 'Gaussian') then
          do k=1,size(p_full,3)
             sig_temp = p_full(i,j,k)/ps(i,j)
             p_factor = exp(-(sig_temp-local_heating_sigcenter)**2/(2*(local_heating_sigwidth)**2) )
-            tdt(i,j,k) =  local_heating_constamp*lat_factor(i,j)*p_factor
+            tdt(i,j,k) =  constamp*lat_factor(i,j)*p_factor
          enddo
       enddo
    enddo
