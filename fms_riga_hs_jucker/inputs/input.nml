@@ -3,7 +3,7 @@
     debug_diag_manager=.true.
 /
 
- &fms_io_nml
+&fms_io_nml
     threading_write = 'single',
     fileset_write = 'single'
 /
@@ -19,21 +19,26 @@
     do_conserve_energy    =  .true.,
     equilibrium_tau_option = 'JFV',
     equilibrium_t_option = 'JFV',
-    pv_sat_flag   =  .false.,
-    sat_only_flag =  .false.,
-    pv_gamma = 4.e-3
-    pv_phi0 = 50.,
-    pv_dphi = -10.,
-    sc_flag = .false.,
+    epsS = 10.,
+    epsN = 40.,
+    do_seasonal_cycle = .false.,
+    perpet_day = 288.,
     sponge_flag	=  .true.,
     sponge_pbottom = 5.e1,
-    sponge_tau_days = 0.5
+    sponge_tau_days = 0.5,
+    local_heating_option = 'Isidoro',
+    local_heating_srfamp = 10.0,
+    local_heating_xcenter = 60.,
+    local_heating_ycenter = 0.0,
+    ! local_heating_xwidth=10.,
+    ! local_heating_ywidth=10.
 /
 
  &main_nml
-         days   = 365,
+         days   = 500,
          dt_atmos = 800
 /
+
 
  &spectral_dynamics_nml
     damping_option          = 'resolution_dependent',

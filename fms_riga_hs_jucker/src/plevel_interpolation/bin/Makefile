@@ -1,23 +1,18 @@
 # Makefile created by mkmf $Id: mkmf,v 18.0 2010/03/02 23:26:08 fms Exp $ 
 
-CPPDEFS = -Duse_netCDF
-
-
-include ./mkmf.template.nyu
-
 
 .DEFAULT:
 	-echo $@ does not exist.
-all: PLEV.exe
+all: plev.x
 SRC =
 OBJ =
 clean: neat
-	-rm -f .PLEV.exe.cppdefs $(OBJ) PLEV.exe
+	-rm -f .plev.x.cppdefs $(OBJ) plev.x
 neat:
 	-rm -f $(TMPFILES)
 TAGS: $(SRC)
 	etags $(SRC)
 tags: $(SRC)
 	ctags $(SRC)
-PLEV.exe: $(OBJ) 
-	$(LD) $(OBJ) -o PLEV.exe  $(LDFLAGS)
+plev.x: $(OBJ) 
+	$(LD) $(OBJ) -o plev.x  $(LDFLAGS)
