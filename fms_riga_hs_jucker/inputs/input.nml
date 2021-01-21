@@ -36,6 +36,12 @@
 
  &main_nml
          days   = 500,
+
+/
+
+ &main_nml
+         days   = 100,
+>>>>>>> origin/tutanium
          dt_atmos = 800
 /
 
@@ -53,7 +59,7 @@
     use_virtual_temperature =.false.,
     vert_advect_uv          = 'second_centered',
     vert_advect_t           = 'second_centered',
-    longitude_origin        = 0.,
+     longitude_origin        = 0.,
     robert_coeff            = .04,
     alpha_implicit          = .5,
     reference_sea_level_press=1.e5,
