@@ -21,11 +21,7 @@
     equilibrium_t_option = 'JFV',
     pv_sat_flag   =  .false.,
     sat_only_flag =  .false.,
-    do_seasonal_cycle = .false.,
-    perpet_day = 288,
-    A_s =-15,
-    T_fact = 0.0,
-    epsS = 40.,
+    do_seasonal_cycle = .true.,
     sponge_flag	=  .true.,
     sponge_pbottom = 5.e1,
     sponge_tau_days = 0.5
