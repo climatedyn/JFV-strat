@@ -41,4 +41,5 @@ HSt42
 # "dynamics",    "apv",            "apv",            "atmos_daily",    "all", .false.,  "none", 2,
 # "dynamics",    "apv",            "apv",            "atmos_average",  "all", .true.,   "none", 2,
  "hs_forcing",  "teq",            "teq",            "atmos_average",  "all", .true.,   "none", 2,
+ "hs_forcing",  "teq",            "teq",            "atmos_daily",    "all", .false.,   "none", 2,
  "hs_forcing",  "tdt_ndamp",      "tdt_ndamp",      "atmos_average",  "all", .true.,   "none", 2,
