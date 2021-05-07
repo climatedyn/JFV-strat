@@ -170,7 +170,8 @@ real    :: damping_coeff       = 1.15740741e-4, & ! (one tenth day)**-1
            exponent            = 2.5, &
          ocean_topog_smoothing = .93, &
            initial_sphum       = 0.0, &
-     reference_sea_level_press =  101325.
+           reference_sea_level_press =  101325., &
+           random_perturbation = 0.0     !mj add random perturbation for ensembles
 !===============================================================================================
 
 real, dimension(2) :: valid_range_t = (/100.,500./)
@@ -186,7 +187,8 @@ namelist /spectral_dynamics_nml/ use_virtual_temperature, damping_option,       
                                  vert_coord_option, scale_heights, surf_res,      &
                                  p_press, p_sigma, exponent, ocean_topog_smoothing, initial_sphum,   &
                                  valid_range_t, eddy_sponge_coeff, zmu_sponge_coeff, zmv_sponge_coeff, &
-                                 print_interval, num_steps, initial_state_option
+                                 print_interval, num_steps, initial_state_option,                    &
+                                 random_perturbation          !mj add random initial perturbation
                                  
 contains
 
@@ -470,6 +472,8 @@ integer, dimension(4) :: siz
 real, dimension(ms:me, ns:ne, num_levels) :: real_part, imag_part
 character(len=64) :: file, tr_name
 character(len=4) :: ch1,ch2,ch3,ch4,ch5,ch6
+! mj: random perturbation
+real, allocatable,dimension(:,:,:) :: rtmp
 
 file = 'INPUT/spectral_dynamics.res.nc'
 if(file_exist(trim(file))) then
@@ -522,6 +526,18 @@ if(file_exist(trim(file))) then
     call read_data(trim(file), 'ug',   ug(:,:,:,nt), grid_domain, timelevel=nt)
     call read_data(trim(file), 'vg',   vg(:,:,:,nt), grid_domain, timelevel=nt)
     call read_data(trim(file), 'tg',   tg(:,:,:,nt), grid_domain, timelevel=nt)
+    !mj random perturbation for ensembles
+    if ( random_perturbation .ne. 0.0 ) then
+       if ( nt .eq. 1 ) then
+          if(mpp_pe() .eq. mpp_root_pe()) write(*,'(a)') ' Adding random temperature perturbation.'
+          allocate(rtmp(size(tg,1),size(tg,2),size(tg,3)))
+       endif
+       call RANDOM_SEED()
+       call RANDOM_NUMBER(rtmp)
+       tg(:,:,:,nt) = tg(:,:,:,nt) + random_perturbation*rtmp
+       call trans_grid_to_spherical(tg(:,:,:,nt),ts(:,:,:,nt))
+    endif
+    !jm
     call read_data(trim(file), 'psg', psg(:,:,  nt), grid_domain, timelevel=nt)
     do ntr = 1,num_tracers
       tr_name = trim(tracer_attributes(ntr)%name)
@@ -578,6 +594,17 @@ else
     call error_mesg('spectral_dynamics_init', trim(initial_state_option)//' is not a valid value of initial_state_option', FATAL)
   end if
 
+  !mj random perturbation for ensembles
+  if ( random_perturbation .ne. 0.0 ) then
+     if(mpp_pe() .eq. mpp_root_pe()) write(*,'(a)') ' Adding random temperature perturbation.'
+     allocate(rtmp(size(tg,1),size(tg,2),size(tg,3)))
+     call RANDOM_SEED()
+     call RANDOM_NUMBER(rtmp)
+     tg(:,:,:,1) = tg(:,:,:,1) + random_perturbation*rtmp
+     call trans_grid_to_spherical(tg(:,:,:,1),ts(:,:,:,1))
+  endif
+
+
   vors (:,:,:,2) = vors (:,:,:,1)
   divs (:,:,:,2) = divs (:,:,:,1)
   ts   (:,:,:,2) = ts   (:,:,:,1)
@@ -593,6 +620,8 @@ else
     spec_tracers(:,:,:,2,ntr) = spec_tracers(:,:,:,1,ntr)
   enddo
 endif
+
+if ( allocated(rtmp) ) deallocate(rtmp)
 
 return
 end subroutine read_restart_or_do_coldstart
