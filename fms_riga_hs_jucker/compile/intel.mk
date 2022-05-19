@@ -30,9 +30,9 @@ LIB_NETCDF := $(shell nc-config --flibs)
 FPPFLAGS := -fpp -Wp,-w
 CPPFLAGS := $(INC_NETCDF) $(INC_MPI)
 
-FFLAGS := -fno-alias -stack_temps -safe_cray_ptr -ftz -i-dynamic -assume byterecl -i4 -r8 -nowarn -g
+FFLAGS := -fno-alias -stack_temps -safe_cray_ptr -ftz -shared-intel -assume byterecl -i4 -r8 -nowarn -g
 FFLAGS += $(INC_NETCDF) $(INC_MPI)
-FFLAGS_OPT = -O2
+FFLAGS_OPT = -O2 -traceback -g
 FFLAGS_REPRO = -fltconsistency
 FFLAGS_DEBUG = -O0 -check -check noarg_temp_created -check nopointer -warn -warn noerrors -debug variable_locations -fpe0 -traceback -ftrapuv
 #FFLAGS_DEBUG = -O0 -traceback -ftrapuv

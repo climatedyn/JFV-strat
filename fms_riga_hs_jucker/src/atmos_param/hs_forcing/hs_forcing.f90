@@ -65,13 +65,12 @@ private
 !------------------- local heating ------------------------------------------------
    character(len=256) :: local_heating_option='' ! Valid options are 'from_file', 'Isidoro', and 'Gaussian'. Local heating not done otherwise.
    character(len=256) :: local_heating_file=''   ! Name of file relative to $work/INPUT  Used only when local_heating_option='from_file'
-   real :: local_heating_srfamp=0.0              ! Degrees per day.   Used only when local_heating_option='Isidoro' or 'Gaussian'
-   real :: local_heating_constamp=0.0            ! sigma height       Used only when local_heating_option='Gaussian' !mj NOT IMPLEMENTED YET
+   real :: local_heating_srfamp=0.0              ! Degrees per day.   Used only when local_heating_option='Isidoro'
+   real :: local_heating_constamp=0.0            ! sigma height       Used only when local_heating_option='Gaussian'
    real :: local_heating_xwidth=10.              ! degrees longitude  Used only when local_heating_option='Isidoro'
-   real :: local_heating_ywidth=10.              ! degrees latitude   Used only when local_heating_option='Isidoro'
+   real :: local_heating_ywidth=10.              ! degrees latitude   Used only when local_heating_option='Isidoro' or 'Gaussian'
    real :: local_heating_xcenter=180.            ! degrees longitude  Used only when local_heating_option='Isidoro'
-   real :: local_heating_ycenter=45.             ! degrees latitude   Used only when local_heating_option='Isidoro'
-   real :: local_heating_latwidth=0.4            ! radians latitude   Used only when local_heating_option='Gaussian'
+   real :: local_heating_ycenter=45.             ! degrees latitude   Used only when local_heating_option='Isidoro' or 'Gaussian'
    real :: local_heating_sigwidth=0.11           ! sigma height       Used only when local_heating_option='Gaussian'
    real :: local_heating_sigcenter=0.3           ! sigma height       Used only when local_heating_option='Gaussian'
    logical :: polar_heating_option=.false.       ! want to add some heating over the pole?
@@ -122,16 +121,20 @@ private
    real :: tau_t=40, tau_N_p=20, tau_S_p=20, delta_phi=30, tau_m=5 ! stratospheric relaxation time setup (tropics, northpole, southpole)
    real :: tau_fact=1.0 ! scale the stratospheric tau profile (0 -> tau=tau_t, 1 -> full tau profile)
    logical :: do_seasonal_cycle=.true.  !add seasonal cycle in stratosphere?
-   real :: days_per_year=365             !for determining seasonal cycle
+   real :: days_per_year=365            !for determining seasonal cycle
+   real :: perpet_day=0                 !if do_seasonal_cycle=.false., set day of year for
+                                        ! perpetual simulation [mj 12/2020]
+   
 !-----------------------------------------------------------------------
 
    namelist /hs_forcing_nml/  no_forcing, surface_forcing_input,             &
    	    		      t_zero, t_strat, delh, delv,                   &
                               sigma_b, ka, ks, kf, do_conserve_energy,       &
                               trflux, trsink, local_heating_srfamp,          &
+                              local_heating_constamp,                        &
                               local_heating_xwidth,  local_heating_ywidth,   &
                               local_heating_xcenter, local_heating_ycenter,  &
-                              local_heating_latwidth, local_heating_sigwidth,& !cc
+                              local_heating_sigwidth,                        & !cc
                               polar_heating_option, polar_heating_srfamp,    & !cc
                               polar_heating_sigcenter,polar_heating_latwidth,& !cc
                               polar_heating_latcenter,polar_heating_sigwidth,& !cc
@@ -150,8 +153,9 @@ private
                               equilibrium_tau_option,equilibrium_tau_file,   &  !mj
                               p_hs,p_bd,A_NH_0,A_NH_1,A_SH_0,A_SH_1,A_s,     &  !mj
                               phi_N,phi_S,tau_t,tau_N_p,tau_S_p,delta_phi,   &  !mj
-                              T_fact,tau_fact,                              &  !mj
-                              tau_m,do_seasonal_cycle,days_per_year             !mj
+                              T_fact,tau_fact,                               &  !mj
+                              tau_m,do_seasonal_cycle,days_per_year,         &  !mj
+                              perpet_day                                        !mj
 
 !-----------------------------------------------------------------------
 
@@ -166,7 +170,7 @@ private
    integer :: id_teq, id_tau, id_tdt, id_udt, id_vdt, id_tdt_diss, id_diss_heat, id_local_heating, id_newtonian_damping
    real    :: missing_value = -1.e10
    real    :: xwidth, ywidth, xcenter, ycenter ! namelist values converted from degrees to radians
-   real    :: srfamp, polar_srfamp! local_heating_srfamp converted from deg/day to deg/sec
+   real    :: srfamp, polar_srfamp, constamp ! local_heating_srfamp converted from deg/day to deg/sec
    character(len=14) :: mod_name = 'hs_forcing'
 
    logical :: module_is_initialized = .false.
@@ -374,6 +378,11 @@ use     tracer_manager_mod, only: get_tracer_index, NO_TRACER !mj
         pv_sat_flag=.false.
         sat_only_flag=.false.
      endif
+     if(do_seasonal_cycle .and. perpet_day .ne. 0)then
+         call error_mesg ('hs_forcing_nml', &
+              'do_seasonal_cycle = .true. but perpet_day != 0: need to decide whether you want a seasonal cycle or not!',FATAL)
+      endif
+        
      if(do_seasonal_cycle) sc_flag = .true.
 
 !     ----- write version info and namelist to log file -----
@@ -399,6 +408,7 @@ use     tracer_manager_mod, only: get_tracer_index, NO_TRACER !mj
 !     ----- convert local_heating_srfamp from deg/day to deg/sec ----
 
       srfamp = local_heating_srfamp/SECONDS_PER_DAY
+      constamp = local_heating_constamp/SECONDS_PER_DAY
       polar_srfamp = polar_heating_srfamp/SECONDS_PER_DAY
 
 !     ----- compute coefficients -----
@@ -620,17 +630,17 @@ real, intent(in),  dimension(:,:,:), optional :: mask
       if(sc_flag)then
          t0n=0
          t0s=days_per_year/2
-!         if (.not.present(Time)) call error_mesg('newtonian_damping','sc_flag true but time not present',FATAL)
+         !         if (.not.present(Time)) call error_mesg('newtonian_damping','sc_flag true but time not present',FATAL)
          call get_time(Time,seconds,days)
          t_days = days+seconds/86400
-         es = max(0.0,sin((t_days-t0s)*2*pid/days_per_year));
-         en = max(0.0,sin((t_days-t0n)*2*pid/days_per_year));
-         eps_sc = eps*cos(2*pid*t_days/days_per_year)
+      else
+         t_days = perpet_day
+      endif
+      es = max(0.0,sin((t_days-t0s)*2*pid/days_per_year));
+      en = max(0.0,sin((t_days-t0n)*2*pid/days_per_year));
+      eps_sc = eps*cos(2*pid*t_days/days_per_year)
 !         eps_sc =  -eps*sin((t_days-t0s)/360*2*pif*180)
 !mj
-      else
-         eps_sc = eps
-      endif
 
       t_star(:,:) = t_zero - delh*sin_lat_2(:,:) - eps_sc*sin_lat(:,:)
       if ( .not. pv_sat_flag) then
@@ -781,8 +791,10 @@ real, intent(in),  dimension(:,:,:), optional :: mask
             if ( do_seasonal_cycle ) then
                call get_time(Time,seconds,days)
                t_days = days+seconds/86400.
+            else if ( perpet_day .lt. 0 ) then
+               t_days = 0.
             else
-               t_days = 0
+               t_days = perpet_day
             endif
             where ( lat .ge. 0. )
                D = cos(twopi*t_days/days_per_year)
@@ -1321,11 +1333,11 @@ else if(trim(local_heating_option) == 'Isidoro') then
 else if(trim(local_heating_option) == 'Gaussian') then
    do j=1,size(lon,2)
       do i=1,size(lon,1)
-         lat_factor(i,j) = exp( -lat(i,j)**2/(2*(local_heating_latwidth)**2) )
+         lat_factor(i,j) = exp( -.5*((lat(i,j)-ycenter)/ywidth)**2 ) 
          do k=1,size(p_full,3)
             sig_temp = p_full(i,j,k)/ps(i,j)
             p_factor = exp(-(sig_temp-local_heating_sigcenter)**2/(2*(local_heating_sigwidth)**2) )
-            tdt(i,j,k) = srfamp*lat_factor(i,j)*p_factor
+            tdt(i,j,k) =  constamp*lat_factor(i,j)*p_factor
          enddo
       enddo
    enddo

@@ -27,21 +27,15 @@
     sponge_pbottom = 5.e1,
     sponge_tau_days = 0.5,
     local_heating_option = 'Isidoro',
-    local_heating_srfamp = 10.0,
+    local_heating_srfamp = sss,
     local_heating_xcenter = 60.,
     local_heating_ycenter = 0.0,
-    ! local_heating_xwidth=10.,
-    ! local_heating_ywidth=10.
+    ! local_heating-xwidth = 10.,
+    ! local_heating_ywidth = 10.
 /
 
  &main_nml
          days   = 500,
-
-/
-
- &main_nml
-         days   = 100,
->>>>>>> origin/tutanium
          dt_atmos = 800
 /
 
@@ -59,7 +53,7 @@
     use_virtual_temperature =.false.,
     vert_advect_uv          = 'second_centered',
     vert_advect_t           = 'second_centered',
-     longitude_origin        = 0.,
+    longitude_origin        = 0.,
     robert_coeff            = .04,
     alpha_implicit          = .5,
     reference_sea_level_press=1.e5,
