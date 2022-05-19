@@ -31,6 +31,7 @@ FPPFLAGS := -fpp -Wp,-w
 CPPFLAGS := $(INC_NETCDF) $(INC_MPI)
 
 FFLAGS := -fno-alias -stack_temps -safe_cray_ptr -ftz -i-dynamic -assume byterecl -i4 -r8 -nowarn -g
+FFLAGS := -fno-alias -stack_temps -safe_cray_ptr -ftz -assume byterecl -i4 -r8 -nowarn -g
 FFLAGS += $(INC_NETCDF) $(INC_MPI)
 FFLAGS_OPT = -O2
 FFLAGS_REPRO = -fltconsistency
