@@ -67,9 +67,9 @@ private
    character(len=256) :: local_heating_file=''   ! Name of file relative to $work/INPUT  Used only when local_heating_option='from_file'
    real :: local_heating_srfamp=0.0              ! Degrees per day.   Used only when local_heating_option='Isidoro'
    real :: local_heating_constamp=0.0            ! sigma height       Used only when local_heating_option='Gaussian'
-   real :: local_heating_xwidth=10.              ! degrees longitude  Used only when local_heating_option='Isidoro'
+   real :: local_heating_xwidth=10.              ! degrees longitude  Used only when local_heating_option='Isidoro' or 'Gaussian'
    real :: local_heating_ywidth=10.              ! degrees latitude   Used only when local_heating_option='Isidoro' or 'Gaussian'
-   real :: local_heating_xcenter=180.            ! degrees longitude  Used only when local_heating_option='Isidoro'
+   real :: local_heating_xcenter=180.            ! degrees longitude  Used only when local_heating_option='Isidoro' or 'Gaussian'
    real :: local_heating_ycenter=45.             ! degrees latitude   Used only when local_heating_option='Isidoro' or 'Gaussian'
    real :: local_heating_sigwidth=0.11           ! sigma height       Used only when local_heating_option='Gaussian'
    real :: local_heating_sigcenter=0.3           ! sigma height       Used only when local_heating_option='Gaussian'
@@ -1333,11 +1333,20 @@ else if(trim(local_heating_option) == 'Isidoro') then
 else if(trim(local_heating_option) == 'Gaussian') then
    do j=1,size(lon,2)
       do i=1,size(lon,1)
+         if (xwidth .gt. 0.0 ) then
+            lon_temp = lon(i,j)
+            ! Make sure lon_temp falls in the range zero to 2*PI
+            x_temp = floor(lon_temp/twopi)
+            lon_temp = lon_temp - twopi*x_temp
+            lon_factor(i,j) = exp(-.5*((lon_temp-xcenter)/xwidth)**2)
+         else
+            lon_factor(i,j) = 1.0
+         endif
          lat_factor(i,j) = exp( -.5*((lat(i,j)-ycenter)/ywidth)**2 ) 
          do k=1,size(p_full,3)
             sig_temp = p_full(i,j,k)/ps(i,j)
             p_factor = exp(-(sig_temp-local_heating_sigcenter)**2/(2*(local_heating_sigwidth)**2) )
-            tdt(i,j,k) =  constamp*lat_factor(i,j)*p_factor
+            tdt(i,j,k) =  constamp*lat_factor(i,j)*lon_factor(i,j)*p_factor
          enddo
       enddo
    enddo
