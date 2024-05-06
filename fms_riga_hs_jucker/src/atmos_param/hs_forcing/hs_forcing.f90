@@ -63,16 +63,17 @@ private
    real :: trsink = -0.     !  damping time for tracer
 
 !------------------- local heating ------------------------------------------------
+integer,parameter :: ngauss = 10
    character(len=256) :: local_heating_option='' ! Valid options are 'from_file', 'Isidoro', and 'Gaussian'. Local heating not done otherwise.
    character(len=256) :: local_heating_file=''   ! Name of file relative to $work/INPUT  Used only when local_heating_option='from_file'
    real :: local_heating_srfamp=0.0              ! Degrees per day.   Used only when local_heating_option='Isidoro'
-   real :: local_heating_constamp=0.0            ! sigma height       Used only when local_heating_option='Gaussian'
-   real :: local_heating_xwidth=10.              ! degrees longitude  Used only when local_heating_option='Isidoro' or 'Gaussian'
-   real :: local_heating_ywidth=10.              ! degrees latitude   Used only when local_heating_option='Isidoro' or 'Gaussian'
-   real :: local_heating_xcenter=180.            ! degrees longitude  Used only when local_heating_option='Isidoro' or 'Gaussian'
-   real :: local_heating_ycenter=45.             ! degrees latitude   Used only when local_heating_option='Isidoro' or 'Gaussian'
-   real :: local_heating_sigwidth=0.11           ! sigma height       Used only when local_heating_option='Gaussian'
-   real :: local_heating_sigcenter=0.3           ! sigma height       Used only when local_heating_option='Gaussian'
+   real,dimension(ngauss) :: local_heating_constamp=0.0            ! sigma height       Used only when local_heating_option='Gaussian'
+   real,dimension(ngauss) :: local_heating_xwidth=10.              ! degrees longitude  Used only when local_heating_option='Isidoro' or 'Gaussian'
+   real,dimension(ngauss) :: local_heating_ywidth=10.              ! degrees latitude   Used only when local_heating_option='Isidoro' or 'Gaussian'
+   real,dimension(ngauss) :: local_heating_xcenter=180.            ! degrees longitude  Used only when local_heating_option='Isidoro' or 'Gaussian'
+   real,dimension(ngauss) :: local_heating_ycenter=45.             ! degrees latitude   Used only when local_heating_option='Isidoro' or 'Gaussian'
+   real,dimension(ngauss) :: local_heating_sigwidth=0.11           ! sigma height       Used only when local_heating_option='Gaussian'
+   real,dimension(ngauss) :: local_heating_sigcenter=0.3           ! sigma height       Used only when local_heating_option='Gaussian'
    logical :: polar_heating_option=.false.       ! want to add some heating over the pole?
    real :: polar_heating_srfamp=0.0              ! Degrees per day    Used only when polar heating_option='true'
    real :: polar_heating_latwidth=0.0            ! radians latitude   Used only when polar_heating_option='true'
@@ -169,8 +170,9 @@ private
 
    integer :: id_teq, id_tau, id_tdt, id_udt, id_vdt, id_tdt_diss, id_diss_heat, id_local_heating, id_newtonian_damping
    real    :: missing_value = -1.e10
-   real    :: xwidth, ywidth, xcenter, ycenter ! namelist values converted from degrees to radians
-   real    :: srfamp, polar_srfamp, constamp ! local_heating_srfamp converted from deg/day to deg/sec
+   real,dimension(ngauss)    :: xwidth, ywidth, xcenter, ycenter ! namelist values converted from degrees to radians
+   real    :: srfamp, polar_srfamp ! local_heating_srfamp converted from deg/day to deg/sec
+   real,dimension(ngauss)  :: constamp = 0.
    character(len=14) :: mod_name = 'hs_forcing'
 
    logical :: module_is_initialized = .false.
@@ -208,6 +210,7 @@ use     tracer_manager_mod, only: get_tracer_index, NO_TRACER !mj
    real, dimension(size(r,1),size(r,2),size(r,3)) :: rst, rtnd, vort
    real, dimension(size(r,1),size(r,2),size(r,3)) :: tst, pvt !mj
    integer :: i, j, k, kb, n, num_tracers
+   integer :: NN
    integer :: n_hum, n_pv !mj
    logical :: used
    real    :: flux, sink, value
@@ -355,6 +358,7 @@ use     tracer_manager_mod, only: get_tracer_index, NO_TRACER !mj
 
 !-----------------------------------------------------------------------
    integer  unit, io, ierr
+   integer  NN
 
 !     ----- read namelist -----
 
@@ -395,21 +399,22 @@ use     tracer_manager_mod, only: get_tracer_index, NO_TRACER !mj
       twopi = 2*PI
 
 !     ----- convert local heating variables from degrees to radians -----
-
-      xwidth  = local_heating_xwidth*PI/180.
-      ywidth  = local_heating_ywidth*PI/180.
-      xcenter = local_heating_xcenter*PI/180.
-      ycenter = local_heating_ycenter*PI/180.
+      do NN=1,ngauss
+         xwidth(NN)  = local_heating_xwidth(NN)*PI/180.
+         ywidth(NN)  = local_heating_ywidth(NN)*PI/180.
+         xcenter(NN) = local_heating_xcenter(NN)*PI/180.
+         ycenter(NN) = local_heating_ycenter(NN)*PI/180.
 
 !     ----- Make sure xcenter falls in the range zero to 2*PI -----
 
-      xcenter = xcenter - twopi*floor(xcenter/twopi)
+         xcenter(NN) = xcenter(NN) - twopi*floor(xcenter(NN)/twopi)
 
 !     ----- convert local_heating_srfamp from deg/day to deg/sec ----
 
-      srfamp = local_heating_srfamp/SECONDS_PER_DAY
-      constamp = local_heating_constamp/SECONDS_PER_DAY
-      polar_srfamp = polar_heating_srfamp/SECONDS_PER_DAY
+         srfamp = local_heating_srfamp/SECONDS_PER_DAY
+         constamp(NN) = local_heating_constamp(NN)/SECONDS_PER_DAY
+         polar_srfamp = polar_heating_srfamp/SECONDS_PER_DAY
+      enddo
 
 !     ----- compute coefficients -----
 
@@ -1294,6 +1299,7 @@ use  press_and_geopot_mod, only: compute_pressures_and_heights
 
 type(time_type), intent(in)         :: Time
 integer, intent(in)                 :: is,js
+integer :: NN
 real, intent(in),  dimension(:,:)   :: lon, lat, ps, surf_geopotential !cc
 real, intent(in),  dimension(:,:,:) :: p_full, tg !cc
 real, intent(in),  dimension(:,:,:) :: p_half
@@ -1316,40 +1322,47 @@ if(trim(local_heating_option) == 'from_file') then
    call interpolator( heating_source_interp, Time, p_half, tdt, trim(local_heating_file))
    tdt = tdt/SECONDS_PER_DAY !mj input file is in deg_K/day
 else if(trim(local_heating_option) == 'Isidoro') then
-   do j=1,size(lon,2)
-   do i=1,size(lon,1)
-     lon_temp = lon(i,j)
-     ! Make sure lon_temp falls in the range zero to 2*PI
-     x_temp = floor(lon_temp/twopi)
-     lon_temp = lon_temp - twopi*x_temp
-     lon_factor(i,j) = exp(-.5*((lon_temp-xcenter)/xwidth)**2)
-     lat_factor(i,j) = exp(-.5*((lat(i,j)-ycenter)/ywidth)**2)
-     do k=1,size(p_full,3)
-       p_factor = exp((p_full(i,j,k)-ps(i,j))/local_heating_vert_decay)
-       tdt(i,j,k) = srfamp*lon_factor(i,j)*lat_factor(i,j)*p_factor
-     enddo
-   enddo
-   enddo
-else if(trim(local_heating_option) == 'Gaussian') then
-   do j=1,size(lon,2)
-      do i=1,size(lon,1)
-         if (xwidth .gt. 0.0 ) then
-            lon_temp = lon(i,j)
-            ! Make sure lon_temp falls in the range zero to 2*PI
-            x_temp = floor(lon_temp/twopi)
-            lon_temp = lon_temp - twopi*x_temp
-            lon_factor(i,j) = exp(-.5*((lon_temp-xcenter)/xwidth)**2)
-         else
-            lon_factor(i,j) = 1.0
-         endif
-         lat_factor(i,j) = exp( -.5*((lat(i,j)-ycenter)/ywidth)**2 ) 
+    tdt=0
+    do NN=1,ngauss
+       do j=1,size(lon,2)
+       do i=1,size(lon,1)
+         lon_temp = lon(i,j)
+         ! Make sure lon_temp falls in the range zero to 2*PI
+         x_temp = floor(lon_temp/twopi)
+         lon_temp = lon_temp - twopi*x_temp
+         lon_factor(i,j) = exp(-.5*((lon_temp-xcenter(NN))/xwidth(NN))**2)
+         lat_factor(i,j) = exp(-.5*((lat(i,j)-ycenter(NN))/ywidth(NN))**2)
          do k=1,size(p_full,3)
-            sig_temp = p_full(i,j,k)/ps(i,j)
-            p_factor = exp(-(sig_temp-local_heating_sigcenter)**2/(2*(local_heating_sigwidth)**2) )
-            tdt(i,j,k) =  constamp*lat_factor(i,j)*lon_factor(i,j)*p_factor
+           p_factor = exp((p_full(i,j,k)-ps(i,j))/local_heating_vert_decay)
+           tdt(i,j,k) = tdt(i,j,k) + srfamp*lon_factor(i,j)*lat_factor(i,j)*p_factor
          enddo
-      enddo
-   enddo
+       enddo
+       enddo      
+    enddo
+
+else if(trim(local_heating_option) == 'Gaussian') then
+    tdt = 0.
+    do NN=1,ngauss
+       do j=1,size(lon,2)
+          do i=1,size(lon,1)
+             if (xwidth(NN) .gt. 0.0 ) then
+                lon_temp = lon(i,j)
+                ! Make sure lon_temp falls in the range zero to 2*PI
+                x_temp = floor(lon_temp/twopi)
+                lon_temp = lon_temp - twopi*x_temp
+                lon_factor(i,j) = exp(-.5*((lon_temp-xcenter(NN))/xwidth(NN))**2)
+             else
+                lon_factor(i,j) = 1.0
+             endif
+             lat_factor(i,j) = exp( -.5*((lat(i,j)-ycenter(NN))/ywidth(NN))**2 ) 
+             do k=1,size(p_full,3)
+                sig_temp = p_full(i,j,k)/ps(i,j)
+                p_factor = exp(-(sig_temp-local_heating_sigcenter(NN))**2/(2*(local_heating_sigwidth(NN))**2) )
+                tdt(i,j,k) =  tdt(i,j,k) + constamp(NN)*lat_factor(i,j)*lon_factor(i,j)*p_factor
+             enddo
+          enddo
+       enddo
+    enddo
 else if(trim(local_heating_option) == 'Eichelberger') then
    call compute_pressures_and_heights(tg, ps, surf_geopotential, z_full, z_half, p_full_dummy, p_half_dummy) !cc; dummy variable because I don't want the pressure variables to be overwritten in case it screws the whole model up
    do j=1,size(lon,2)
